@@ -2,10 +2,15 @@
 #include "connection.h"
 #include "internal.h"
 
+SSL_CTX *create_default_ssl_ctx(__attribute__((unused)) HttpRequest *request) {
+    return SSL_CTX_new(SSLv23_client_method());
+}
+
 struct HttpOptions HttpOptions = {
         .maxRedirects = 30,
         .bufferSize = 4096,
         .earlyTerminateRedirects = true,
+        .onCreateSSLCTX = create_default_ssl_ctx
 };
 
 void free_url_info(HttpRequest *request) {
@@ -35,7 +40,6 @@ HttpRequest clone_redirect_http_request(HttpRequest *request, const char *new_ur
             .headers = request->headers,
             .headersCount = request->headersCount,
             .ssl = request->ssl,
-            .sslMethod = request->sslMethod,
             .followRedirects = request->followRedirects,
             .tag = request->tag,
             .onComplete = request->onComplete,
@@ -72,7 +76,7 @@ HttpResponse *internal_http_request(HttpRequest *request, int redirect_num) {
         request->onStart(request);
     }
 
-    HttpConnection *connection = create_and_connect_socket(request);
+    HttpConnection *connection = create_and_connect_socket(request, &HttpOptions);
     if (connection == NULL) {
         call_on_complete_request(request);
         return NULL;

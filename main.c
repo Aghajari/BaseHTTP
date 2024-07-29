@@ -20,7 +20,7 @@ void response_callback(HttpRequest *request, HttpResponse *response) {
         printf("%s: %s\n", response->headers[i].key, response->headers[i].value);
     }
     printf("\nBody:\n%s\n", response->body);
-    //http_save_response_as_file(response, "test.jpg");
+    // http_save_response_as_file(response, "test.jpg");
     http_free_response(response);
 }
 
@@ -49,7 +49,6 @@ int main(void) {
             .headersCount = sizeof(headers) / sizeof(headers[0]),
             .followRedirects = true,
             .ssl = true,
-            .sslMethod = NULL,
             .receiveTimeout = {.tv_sec = 1},
             .sendTimeout = {.tv_sec = 1},
             .connectTimeout = {.tv_sec = 2},

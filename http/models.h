@@ -58,7 +58,6 @@ struct HttpRequest {
     int headersCount;
     bool followRedirects;
     bool ssl;
-    const SSL_METHOD *sslMethod;
     struct timeval receiveTimeout;
     struct timeval sendTimeout;
     struct timeval connectTimeout;
@@ -101,6 +100,10 @@ struct HttpOptions {
     unsigned int maxRedirects;
     unsigned int bufferSize;
     bool earlyTerminateRedirects;
+
+    SSL_CTX *(*onCreateSSLCTX)(
+            struct HttpRequest *request
+    );
 };
 
 #endif

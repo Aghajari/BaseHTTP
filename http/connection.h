@@ -3,7 +3,10 @@
 
 #include "internal.h"
 
-HttpConnection *create_and_connect_socket(HttpRequest *request);
+HttpConnection *create_and_connect_socket(
+        HttpRequest *request,
+        struct HttpOptions *options
+);
 
 int create_url(HttpRequest *request);
 

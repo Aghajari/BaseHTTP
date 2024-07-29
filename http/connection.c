@@ -91,19 +91,14 @@ int create_url(HttpRequest *request) {
     return 0;
 }
 
-HttpConnection *create_ssl(int sock, HttpRequest *request) {
+HttpConnection *create_ssl(int sock, HttpRequest *request, struct HttpOptions *options) {
     SSL_CTX *ctx;
     SSL *ssl;
 
     SSL_load_error_strings();
     OpenSSL_add_ssl_algorithms();
 
-    const SSL_METHOD *sslMethod = request->sslMethod;
-    if (sslMethod == NULL) {
-        sslMethod = SSLv23_client_method();
-    }
-
-    ctx = SSL_CTX_new(sslMethod);
+    ctx = options->onCreateSSLCTX(request);
     if (!ctx) {
         if (request->onError) {
             request->onError(request, "Unable to create SSL context", HTTP_ERR_SSL);
@@ -240,7 +235,7 @@ void error_socket(int sock, HttpRequest *request, const char *message, int error
     }
 }
 
-HttpConnection *create_and_connect_socket(HttpRequest *request) {
+HttpConnection *create_and_connect_socket(HttpRequest *request, struct HttpOptions *options) {
     int sock;
     struct sockaddr_in server_addr;
     struct hostent *he;
@@ -293,7 +288,7 @@ HttpConnection *create_and_connect_socket(HttpRequest *request) {
     }
 
     if (request->ssl && request->urlInfo.isHttps) {
-        return create_ssl(sock, request);
+        return create_ssl(sock, request, options);
     } else {
         HttpConnection *conn = malloc(sizeof(HttpConnection));
         if (!conn) {
