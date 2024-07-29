@@ -100,7 +100,7 @@ HttpConnection *create_ssl(int sock, HttpRequest *request) {
 
     const SSL_METHOD *sslMethod = request->sslMethod;
     if (sslMethod == NULL) {
-        sslMethod = TLS_client_method();
+        sslMethod = SSLv23_client_method();
     }
 
     ctx = SSL_CTX_new(sslMethod);
@@ -124,9 +124,30 @@ HttpConnection *create_ssl(int sock, HttpRequest *request) {
 
     SSL_set_fd(ssl, sock);
 
-    if (SSL_connect(ssl) <= 0) {
+    while (true) {
+        int connect = SSL_connect(ssl);
+        if (connect > 0) {
+            break;
+        }
+        int err = SSL_get_error(ssl, connect);
+        if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+            fd_set fdset;
+            FD_ZERO(&fdset);
+            FD_SET(sock, &fdset);
+
+            if (err == SSL_ERROR_WANT_READ) {
+                select(sock + 1, &fdset, NULL, NULL, NULL);
+            } else {
+                select(sock + 1, NULL, &fdset, NULL, NULL);
+            }
+        } else {
+            break;
+        }
+    }
+
+    if (connect <= 0) {
         if (request->onError) {
-            request->onError(request, "SSL handshake failed", HTTP_ERR_SSL);
+            request->onError(request, ERR_reason_error_string(ERR_get_error()), HTTP_ERR_SSL);
         }
         SSL_free(ssl);
         close(sock);
