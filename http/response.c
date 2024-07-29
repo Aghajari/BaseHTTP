@@ -44,11 +44,7 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
     response->headers = malloc(sizeof(HttpResponse) * max_headers);
 
     if (!response->headers) {
-        if (request->onError != NULL) {
-            request->onError(request, "Failed to malloc headers", HTTP_ERR_MEMORY);
-        }
-        close_connection(connection);
-        return -1;
+        return error(connection, request, "Failed to malloc headers", HTTP_ERR_MEMORY);
     }
 
     while ((bytes_received = recv_connection(connection, recv_data, recv_buffer_size)) > 0) {
@@ -56,30 +52,17 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
             recv_data[bytes_received] = '\0';
             char *newline_ptr = strchr(recv_data, '\n');
             if (newline_ptr == NULL) {
+                unsigned int old_size = line_feed_data_size;
+                line_feed_data_size += bytes_received;
                 if (line_feed_data == NULL) {
-                    line_feed_data_size = bytes_received;
                     line_feed_data = malloc(line_feed_data_size);
-                    if (!line_feed_data) {
-                        if (request->onError != NULL) {
-                            request->onError(request, "Failed to malloc response", HTTP_ERR_MEMORY);
-                        }
-                        close_connection(connection);
-                        return -1;
-                    }
-                    memcpy(line_feed_data, recv_data, bytes_received);
                 } else {
-                    unsigned int old_size = line_feed_data_size;
-                    line_feed_data_size += bytes_received;
                     line_feed_data = realloc(line_feed_data, line_feed_data_size);
-                    if (!line_feed_data) {
-                        if (request->onError != NULL) {
-                            request->onError(request, "Failed to realloc response", HTTP_ERR_MEMORY);
-                        }
-                        close_connection(connection);
-                        return -1;
-                    }
-                    memcpy(line_feed_data + old_size, recv_data, bytes_received);
                 }
+                if (!line_feed_data) {
+                    return error(connection, request, "Failed to malloc response", HTTP_ERR_MEMORY);
+                }
+                memcpy(line_feed_data + old_size, recv_data, bytes_received);
             } else {
                 char *data = recv_data;
                 int this_recv_read = 0;
@@ -93,11 +76,7 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
                         line_feed_data_size += line_len;
                         line_feed_data = realloc(line_feed_data, line_feed_data_size + 1);
                         if (!line_feed_data) {
-                            if (request->onError != NULL) {
-                                request->onError(request, "Failed to realloc response", HTTP_ERR_MEMORY);
-                            }
-                            close_connection(connection);
-                            return -1;
+                            return error(connection, request, "Failed to realloc response", HTTP_ERR_MEMORY);
                         }
                         memcpy(line_feed_data + old_size, data, line_len);
                         line_feed_data[line_feed_data_size] = '\0';
@@ -118,14 +97,10 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
                                         sizeof(HttpResponse) * max_headers
                                 );
                                 if (!response->headers) {
-                                    if (request->onError != NULL) {
-                                        request->onError(request, "Failed to realloc headers", HTTP_ERR_MEMORY);
-                                    }
                                     if (line_feed_data != NULL) {
                                         free(line_feed_data);
                                     }
-                                    close_connection(connection);
-                                    return -1;
+                                    return error(connection, request, "Failed to realloc headers", HTTP_ERR_MEMORY);
                                 }
                             }
 
@@ -151,11 +126,7 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
                     line_feed_data_size = bytes_received - this_recv_read;
                     line_feed_data = malloc(line_feed_data_size);
                     if (!line_feed_data) {
-                        if (request->onError != NULL) {
-                            request->onError(request, "Failed to malloc response", HTTP_ERR_MEMORY);
-                        }
-                        close_connection(connection);
-                        return -1;
+                        return error(connection, request, "Failed to malloc response", HTTP_ERR_MEMORY);
                     }
                     memcpy(line_feed_data, data, line_feed_data_size);
                 }
@@ -165,14 +136,10 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
                 data_buffer_size += line_feed_data_size;
                 response->body = malloc(data_buffer_size);
                 if (!response->body) {
-                    if (request->onError != NULL) {
-                        request->onError(request, "Failed to malloc body", HTTP_ERR_MEMORY);
-                    }
                     if (line_feed_data != NULL) {
                         free(line_feed_data);
                     }
-                    close_connection(connection);
-                    return -1;
+                    return error(connection, request, "Failed to malloc body", HTTP_ERR_MEMORY);
                 }
                 if (line_feed_data != NULL) {
                     memcpy(response->body, line_feed_data, line_feed_data_size);
@@ -186,14 +153,10 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
                 response->body = realloc(response->body, data_buffer_size);
 
                 if (!response->body) {
-                    if (request->onError != NULL) {
-                        request->onError(request, "Failed to realloc body", HTTP_ERR_MEMORY);
-                    }
                     if (line_feed_data != NULL) {
                         free(line_feed_data);
                     }
-                    close_connection(connection);
-                    return -1;
+                    return error(connection, request, "Failed to realloc body", HTTP_ERR_MEMORY);
                 }
             }
 
@@ -202,22 +165,14 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
         }
     }
     if (bytes_received != 0) {
-        if (request->onError != NULL) {
-            request->onError(request, err_connection(connection), HTTP_ERR_CONN_RECV);
-        }
-        close_connection(connection);
-        return -1;
+        return error(connection, request, error_message(connection), HTTP_ERR_CONN_RECV);
     }
 
     if (response->body == NULL && line_feed_data != NULL) {
         response->body = malloc(line_feed_data_size);
         if (!response->body) {
-            if (request->onError != NULL) {
-                request->onError(request, "Failed to malloc body", HTTP_ERR_MEMORY);
-            }
             free(line_feed_data);
-            close_connection(connection);
-            return -1;
+            return error(connection, request, "Failed to malloc body", HTTP_ERR_MEMORY);
         }
         memcpy(response->body, line_feed_data, line_feed_data_size);
         total_bytes += line_feed_data_size;

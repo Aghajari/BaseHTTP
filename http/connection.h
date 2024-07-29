@@ -21,6 +21,13 @@ int recv_connection(
 
 void close_connection(HttpConnection *connection);
 
-char *err_connection(HttpConnection *connection);
+char *error_message(HttpConnection *connection);
+
+int error(
+        HttpConnection *connection,
+        HttpRequest *request,
+        const char *error_message,
+        int error_code
+);
 
 #endif //BASE_HTTP_CONNECTION_H

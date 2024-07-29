@@ -27,11 +27,7 @@ const char *get_http_method_string(HttpMethod method) {
 int send_http_request(HttpConnection *connection, HttpRequest *request) {
     const char *method = get_http_method_string(request->method);
     if (method == NULL) {
-        if (request->onError != NULL) {
-            request->onError(request, "HTTP Method is invalid!", HTTP_ERR_INVALID_METHOD);
-        }
-        close_connection(connection);
-        return -1;
+        return error(connection, request, "HTTP Method is invalid!", HTTP_ERR_INVALID_METHOD);
     }
 
     int hasBody = request->body != NULL && request->bodyLength > 0;
@@ -97,11 +93,7 @@ int send_http_request(HttpConnection *connection, HttpRequest *request) {
     while (total_sent < to_send) {
         int bytes_sent = write_connection(connection, send_data + total_sent, to_send - total_sent);
         if (bytes_sent <= 0) {
-            if (request->onError != NULL) {
-                request->onError(request, err_connection(connection), HTTP_ERR_CONN_WRITE);
-            }
-            close_connection(connection);
-            return -1;
+            return error(connection, request, error_message(connection), HTTP_ERR_CONN_WRITE);
         }
         total_sent += bytes_sent;
     }
@@ -115,11 +107,7 @@ int send_http_request(HttpConnection *connection, HttpRequest *request) {
     while (total_sent < to_send) {
         int bytes_sent = write_connection(connection, request->body + total_sent, to_send - total_sent);
         if (bytes_sent <= 0) {
-            if (request->onError != NULL) {
-                request->onError(request, err_connection(connection), HTTP_ERR_CONN_WRITE);
-            }
-            close_connection(connection);
-            return -1;
+            return error(connection, request, error_message(connection), HTTP_ERR_CONN_WRITE);
         }
         total_sent += bytes_sent;
     }

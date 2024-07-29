@@ -210,6 +210,15 @@ int connect_socket(
     return result;
 }
 
+void error_socket(int sock, HttpRequest *request, const char *message, int error_code) {
+    if (request->onError != NULL) {
+        request->onError(request, message, error_code);
+    }
+    if (sock != -1) {
+        close(sock);
+    }
+}
+
 HttpConnection *create_and_connect_socket(HttpRequest *request) {
     int sock;
     struct sockaddr_in server_addr;
@@ -224,9 +233,7 @@ HttpConnection *create_and_connect_socket(HttpRequest *request) {
     }
 
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        if (request->onError != NULL) {
-            request->onError(request, strerror(errno), HTTP_ERR_SOCKET);
-        }
+        error_socket(-1, request, strerror(errno), HTTP_ERR_SOCKET);
         return NULL;
     }
 
@@ -238,10 +245,7 @@ HttpConnection *create_and_connect_socket(HttpRequest *request) {
                 (const char *) &request->receiveTimeout,
                 sizeof(struct timeval)
         ) < 0) {
-        if (request->onError != NULL) {
-            request->onError(request, strerror(errno), HTTP_ERR_SOCKET);
-        }
-        close(sock);
+        error_socket(sock, request, strerror(errno), HTTP_ERR_SOCKET);
         return NULL;
     }
 
@@ -253,10 +257,7 @@ HttpConnection *create_and_connect_socket(HttpRequest *request) {
                 (const char *) &request->sendTimeout,
                 sizeof(struct timeval)
         ) < 0) {
-        if (request->onError != NULL) {
-            request->onError(request, strerror(errno), HTTP_ERR_SOCKET);
-        }
-        close(sock);
+        error_socket(sock, request, strerror(errno), HTTP_ERR_SOCKET);
         return NULL;
     }
 
@@ -266,10 +267,7 @@ HttpConnection *create_and_connect_socket(HttpRequest *request) {
     bzero(&(server_addr.sin_zero), 8);
 
     if (connect_socket(request, sock, (struct sockaddr *) &server_addr, sizeof(struct sockaddr)) == -1) {
-        if (request->onError != NULL) {
-            request->onError(request, strerror(errno), HTTP_ERR_SOCKET_CONNECT);
-        }
-        close(sock);
+        error_socket(sock, request, strerror(errno), HTTP_ERR_SOCKET_CONNECT);
         return NULL;
     }
 
@@ -278,10 +276,7 @@ HttpConnection *create_and_connect_socket(HttpRequest *request) {
     } else {
         HttpConnection *conn = malloc(sizeof(HttpConnection));
         if (!conn) {
-            if (request->onError != NULL) {
-                request->onError(request, "Failed to malloc HttpConnection", HTTP_ERR_MEMORY);
-            }
-            close(sock);
+            error_socket(sock, request, "Failed to malloc HttpConnection", HTTP_ERR_MEMORY);
             return NULL;
         }
         conn->ssl = NULL;
@@ -291,7 +286,7 @@ HttpConnection *create_and_connect_socket(HttpRequest *request) {
     }
 }
 
-char *err_connection(HttpConnection *connection) {
+char *error_message(HttpConnection *connection) {
     if (connection->ssl != NULL) {
         unsigned long err_code = ERR_get_error();
         if (err_code != 0) {
@@ -332,4 +327,17 @@ void close_connection(HttpConnection *connection) {
         EVP_cleanup();
     }
     free(connection);
+}
+
+int error(
+        HttpConnection *connection,
+        HttpRequest *request,
+        const char *error_message,
+        int error_code
+) {
+    if (request->onError != NULL) {
+        request->onError(request, error_message, error_code);
+    }
+    close_connection(connection);
+    return -1;
 }
