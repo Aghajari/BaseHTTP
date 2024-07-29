@@ -4,6 +4,8 @@ A simple C-based HTTP client designed to demonstrate the basics of sending and r
 
 You can read about the HTTP/1.1 protocol in the RFC document [here](https://www.w3.org/Protocols/rfc2616/rfc2616.html).
 
+The `read_http_response` function is designed to handle the complete reception of an HTTP response from the server in a single continuous process. It reads the response status line, headers, and body, managing chunks of data as they are received from the server. This function ensures that it parses the status line and headers correctly before proceeding to read the response body. By handling data in chunks, it efficiently manages network communication and ensures that the entire response is processed seamlessly, regardless of how the data is fragmented during transmission.
+
 ## Features
 - **Send HTTP requests**: Easily send GET, POST, HEAD and other requests to interact with web servers.
 - **SSL/TLS Support**: Secure HTTP communication using SSL/TLS for HTTPS requests.
