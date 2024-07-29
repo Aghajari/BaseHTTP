@@ -30,7 +30,7 @@ void complete_callback(HttpRequest *request) {
 }
 
 void error_callback(HttpRequest *request, const char *error_message, int error_code) {
-    printf("Error %s (%d): %s\n", request->url, error_code, error_message);
+    printf("Error: %s\n", error_message);
 }
 
 void response_callback(HttpRequest *request, HttpResponse *response) {
@@ -44,7 +44,13 @@ void response_callback(HttpRequest *request, HttpResponse *response) {
 }
 
 void redirect_callback(HttpRequest *oldRequest, HttpRequest *newRequest, HttpResponse *response) {
-    printf("Request redirected from %s to %s", oldRequest->url, newRequest->url);
+    printf("Request redirected from %s to %s\n", oldRequest->url, newRequest->url);
+}
+
+void progress_callback(HttpRequest *request, unsigned int bytes_read, int content_length) {
+    if (content_length > 0) {
+        printf("Progress: %lf\n", bytes_read * 100.0 / content_length);
+    }
 }
 
 int main(void) {
@@ -70,6 +76,7 @@ int main(void) {
             .onError = error_callback,
             .onRedirect = redirect_callback,
             .onResponse = response_callback,
+            .onProgress = progress_callback,
     };
 
     http_request(&request);
