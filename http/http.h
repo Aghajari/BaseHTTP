@@ -3,7 +3,7 @@
 
 #include "models.h"
 
-extern int HTTP_MAX_REDIRECTS;
+extern struct HttpOptions HttpOptions;
 
 HttpResponse *http_request(HttpRequest *request);
 

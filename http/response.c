@@ -26,14 +26,39 @@ void parse_header_line(char *line, HttpHeader *header) {
     }
 }
 
-int read_http_response(HttpConnection *connection, HttpResponse *response, HttpRequest *request) {
-    unsigned int recv_buffer_size = 4096;
+int is_location(HttpHeader *header) {
+    return strcasecmp(header->key, "Location") == 0;
+}
+
+int get_content_length(HttpHeader *header) {
+    if (strcasecmp(header->key, "Content-Length") == 0) {
+        return atoi(header->value);
+    }
+    return -1;
+}
+
+int has_redirected(HttpResponse *response) {
+    return response->statusCode == 301 ||
+           response->statusCode == 302 ||
+           response->statusCode == 307 ||
+           response->statusCode == 308;
+}
+
+int read_http_response(
+        HttpConnection *connection,
+        HttpResponse *response,
+        HttpRequest *request,
+        struct HttpOptions *options
+) {
+    unsigned int recv_buffer_size = options->bufferSize;
     char recv_data[recv_buffer_size + 1];
     char *line_feed_data = NULL;
     unsigned int line_feed_data_size = 0;
 
     unsigned int total_bytes = 0, data_buffer_size = recv_buffer_size;
     int bytes_received;
+    response->statusCode = 0;
+    response->statusMessage[0] = '\0';
     response->body = NULL;
     response->bodyLength = 0;
 
@@ -42,6 +67,8 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
     unsigned int max_headers = 10;
     response->headersCount = 0;
     response->headers = malloc(sizeof(HttpResponse) * max_headers);
+    int content_length = -1;
+    bool look_for_location_to_terminate = false;
 
     if (!response->headers) {
         return error(connection, request, "Failed to malloc headers", HTTP_ERR_MEMORY);
@@ -86,6 +113,9 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
                     if (parser_step == PARSING_STATUS) {
                         parse_status_line(line_str, response);
                         parser_step = PARSING_HEADERS;
+                        if (options->earlyTerminateRedirects && has_redirected(response)) {
+                            look_for_location_to_terminate = true;
+                        }
                     } else {
                         if ((line_str[0] == '\r' && line_str[1] == '\0') || line_str[0] == '\0') {
                             parser_step = PARSING_BODY;
@@ -104,8 +134,20 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
                                 }
                             }
 
-                            parse_header_line(line_str, &response->headers[response->headersCount]);
+                            HttpHeader *header = &response->headers[response->headersCount];
+                            parse_header_line(line_str, header);
                             response->headersCount++;
+
+                            if (look_for_location_to_terminate && is_location(header)) {
+                                if (line_feed_data != NULL) {
+                                    free(line_feed_data);
+                                }
+                                close_connection(connection);
+                                return 0;
+                            }
+                            if (content_length == -1) {
+                                content_length = get_content_length(header);
+                            }
                         }
                     }
 
@@ -162,6 +204,10 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
 
             memcpy(response->body + total_bytes, recv_data, bytes_received);
             total_bytes += bytes_received;
+
+            if (response->statusCode == 200 && request->onProgress != NULL) {
+                request->onProgress(request, total_bytes, content_length);
+            }
         }
     }
     if (bytes_received != 0) {
@@ -177,6 +223,10 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
         memcpy(response->body, line_feed_data, line_feed_data_size);
         total_bytes += line_feed_data_size;
         free(line_feed_data);
+
+        if (response->statusCode == 200 && request->onProgress != NULL) {
+            request->onProgress(request, total_bytes, content_length);
+        }
     }
 
     response->bodyLength = total_bytes;

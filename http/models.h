@@ -69,6 +69,12 @@ struct HttpRequest {
             int error_code
     );
 
+    void (*onProgress)(
+            struct HttpRequest *request,
+            unsigned int bytes_read,
+            int total_bytes
+    );
+
     void (*onResponse)(
             struct HttpRequest *request,
             HttpResponse *response
@@ -90,5 +96,11 @@ struct HttpRequest {
 };
 
 typedef struct HttpRequest HttpRequest;
+
+struct HttpOptions {
+    unsigned int maxRedirects;
+    unsigned int bufferSize;
+    bool earlyTerminateRedirects;
+};
 
 #endif

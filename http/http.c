@@ -2,7 +2,11 @@
 #include "connection.h"
 #include "internal.h"
 
-int HTTP_MAX_REDIRECTS = 30;
+struct HttpOptions HttpOptions = {
+        .maxRedirects = 30,
+        .bufferSize = 4096,
+        .earlyTerminateRedirects = true,
+};
 
 void free_url_info(HttpRequest *request) {
     if (request->urlInfo.domain != NULL) {
@@ -39,6 +43,7 @@ HttpRequest clone_redirect_http_request(HttpRequest *request, const char *new_ur
             .onError = request->onError,
             .onRedirect = request->onRedirect,
             .onResponse = request->onResponse,
+            .onProgress = request->onProgress,
             .receiveTimeout = request->receiveTimeout,
             .sendTimeout = request->sendTimeout,
             .connectTimeout = request->connectTimeout,
@@ -46,18 +51,11 @@ HttpRequest clone_redirect_http_request(HttpRequest *request, const char *new_ur
     return clone;
 }
 
-int hasRedirected(HttpResponse *response) {
-    return response->statusCode == 301 ||
-           response->statusCode == 302 ||
-           response->statusCode == 307 ||
-           response->statusCode == 308;
-}
-
 HttpResponse *internal_http_request(HttpRequest *request, int redirect_num) {
     request->urlInfo.path = NULL;
     request->urlInfo.domain = NULL;
 
-    if (HTTP_MAX_REDIRECTS > 0 && HTTP_MAX_REDIRECTS < redirect_num) {
+    if (HttpOptions.maxRedirects > 0 && HttpOptions.maxRedirects < redirect_num) {
         if (request->onError != NULL) {
             request->onError(request, "Reached max redirects.", HTTP_ERR_REDIRECTS);
         }
@@ -91,13 +89,13 @@ HttpResponse *internal_http_request(HttpRequest *request, int redirect_num) {
         return NULL;
     }
 
-    if (read_http_response(connection, response, request) == -1) {
+    if (read_http_response(connection, response, request, &HttpOptions) == -1) {
         call_on_complete_request(request);
         free(response);
         return NULL;
     }
 
-    if (request->followRedirects && hasRedirected(response)) {
+    if (request->followRedirects && has_redirected(response)) {
         char *location = http_response_get_header(response, "location");
         if (location == NULL) {
             if (request->onResponse != NULL) {

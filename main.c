@@ -20,11 +20,18 @@ void response_callback(HttpRequest *request, HttpResponse *response) {
         printf("%s: %s\n", response->headers[i].key, response->headers[i].value);
     }
     printf("\nBody:\n%s\n", response->body);
+    //http_save_response_as_file(response, "test.jpg");
     http_free_response(response);
 }
 
 void redirect_callback(HttpRequest *oldRequest, HttpRequest *newRequest, HttpResponse *response) {
     printf("Request redirected from %s to %s\n", oldRequest->url, newRequest->url);
+}
+
+void progress_callback(HttpRequest *request, unsigned int bytes_read, int content_length) {
+    if (content_length > 0) {
+        printf("Progress: %lf\n", bytes_read * 100.0 / content_length);
+    }
 }
 
 int main(void) {
@@ -51,6 +58,7 @@ int main(void) {
             .onError = error_callback,
             .onRedirect = redirect_callback,
             .onResponse = response_callback,
+            .onProgress = progress_callback,
     };
 
     http_request(&request);

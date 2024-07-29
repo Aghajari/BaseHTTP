@@ -17,12 +17,15 @@ int send_http_request(
 int read_http_response(
         HttpConnection *connection,
         HttpResponse *response,
-        HttpRequest *request
+        HttpRequest *request,
+        struct HttpOptions *options
 );
 
 char *http_response_get_header(
         HttpResponse *response,
         char *key
 );
+
+int has_redirected(HttpResponse *response);
 
 #endif //BASE_HTTP_INTERNAL_H
