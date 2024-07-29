@@ -10,7 +10,7 @@ void complete_callback(HttpRequest *request) {
 }
 
 void error_callback(HttpRequest *request, const char *error_message, int error_code) {
-    printf("Error %s (%d): %s\n", request->url, error_code, error_message);
+    printf("Error: %s\n", error_message);
 }
 
 void response_callback(HttpRequest *request, HttpResponse *response) {
@@ -24,7 +24,7 @@ void response_callback(HttpRequest *request, HttpResponse *response) {
 }
 
 void redirect_callback(HttpRequest *oldRequest, HttpRequest *newRequest, HttpResponse *response) {
-    printf("Request redirected from %s to %s", oldRequest->url, newRequest->url);
+    printf("Request redirected from %s to %s\n", oldRequest->url, newRequest->url);
 }
 
 int main(void) {

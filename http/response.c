@@ -91,7 +91,7 @@ int read_http_response(HttpConnection *connection, HttpResponse *response, HttpR
                             parser_step = PARSING_BODY;
                         } else {
                             if (max_headers <= response->headersCount) {
-                                max_headers *= 2;
+                                max_headers += 10;
                                 response->headers = realloc(
                                         response->headers,
                                         sizeof(HttpResponse) * max_headers
