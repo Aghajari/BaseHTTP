@@ -67,7 +67,6 @@ int main(void) {
             .headersCount = sizeof(headers) / sizeof(headers[0]),
             .followRedirects = true,
             .ssl = true,
-            .sslMethod = TLS,
             .receiveTimeout = {.tv_sec = 1},
             .sendTimeout = {.tv_sec = 1},
             .connectTimeout = {.tv_sec = 2},
